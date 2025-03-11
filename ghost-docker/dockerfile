@@ -1,0 +1,4 @@
+FROM ghost:latest
+
+# Copy custom routes.yaml into the Ghost configuration directory
+COPY routes.yaml /var/lib/ghost/content_files/settings/routes.yaml
