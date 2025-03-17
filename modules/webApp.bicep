@@ -104,3 +104,5 @@ resource webAppDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
 }
 
 output hostName string = webApp.properties.hostNames[0]
+output serverFarmId string = appServicePlan.id
+

@@ -138,6 +138,12 @@ resource frontDoorRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' 
       }
       queryStringCachingBehavior: 'UseQueryString'
     }
+    ruleSets: [
+      {
+        id: ruleSets.id
+      }
+    ]
+    enabledState: 'Enabled'
   }
 }
 
@@ -193,5 +199,98 @@ resource siteConfig 'Microsoft.Web/sites/config@2023-12-01' = {
     ]
   }
 }
+
+resource ruleSets 'Microsoft.Cdn/profiles/ruleSets@2024-02-01' = {
+  parent: frontDoorProfile
+  name: 'cache'
+}
+
+resource cachePostsRule 'Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01' = {
+parent: ruleSets
+name: 'cachePosts'
+  properties: {
+    order: 100
+    conditions: [
+      {
+        name: 'UrlPath'
+        parameters: {
+          typeName: 'DeliveryRuleUrlPathMatchConditionParameters'
+          operator: 'Wildcard'
+          negateCondition: false
+          matchValues: [
+            '/*/'
+          ]
+          transforms: []
+        }
+      }
+    ]
+    actions: [
+      {
+        name: 'RouteConfigurationOverride'
+        parameters: {
+          typeName: 'DeliveryRuleRouteConfigurationOverrideActionParameters'
+          cacheConfiguration: {
+            isCompressionEnabled: 'Disabled'
+            queryStringCachingBehavior: 'IgnoreQueryString'
+            cacheBehavior: 'OverrideAlways'
+            cacheDuration: '01:00:00'
+          }
+          originGroupOverride: {
+            originGroup: {
+              id: frontDoorOriginGroup.id
+            }
+            forwardingProtocol: 'MatchRequest'
+          }
+        }
+      }
+    ]
+    matchProcessingBehavior: 'Continue'
+  }
+  dependsOn: [
+    frontDoorOrigin
+  ]
+}
+
+resource excludeCacheRule 'Microsoft.Cdn/profiles/ruleSets/rules@2024-02-01'={
+parent: ruleSets
+name: 'excludeCache'
+  properties: {
+    order: 200
+    conditions: [
+      {
+        name: 'UrlPath'
+        parameters: {
+          typeName: 'DeliveryRuleUrlPathMatchConditionParameters'
+          operator: 'BeginsWith'
+          negateCondition: false
+          matchValues: [
+            '/ghost/*'
+          ]
+          transforms: []
+        }
+      }
+    ]
+    actions: [
+      {
+        name: 'RouteConfigurationOverride'
+        parameters: {
+          typeName: 'DeliveryRuleRouteConfigurationOverrideActionParameters'
+          originGroupOverride: {
+            originGroup: {
+              id: frontDoorOriginGroup.id
+            }
+            forwardingProtocol: 'MatchRequest'
+          }
+        }
+      }
+    ]
+    matchProcessingBehavior: 'Continue'
+  }
+  dependsOn: [
+    frontDoorOrigin
+  ]
+}
+
+
 
 output frontDoorEndpointHostName string = frontDoorEndpoint.properties.hostName

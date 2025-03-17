@@ -2,7 +2,7 @@ routes:
 
 collections:
   /:
-    permalink: /{slug}/
+    permalink: /posts/{slug}/
     template: index
 
 taxonomies:

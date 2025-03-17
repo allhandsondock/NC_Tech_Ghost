@@ -14,6 +14,14 @@ param keyVaultSecretName string
 @secure()
 param keyVaultSecretValue string
 
+@description('API key for ghost backend')
+@secure()
+param ghostApiKey string
+
+@description('API key for ghost backend')
+@secure()
+param ghostApiSecretName string
+
 @description('Location to deploy the resources')
 param location string = resourceGroup().location
 
@@ -22,6 +30,10 @@ param logAnalyticsWorkspaceName string
 
 @description('Web App name to provide access to Key Vault')
 param webAppName string
+
+
+@description('Function App name to provide access to Key Vault')
+param fnAppName string
 
 resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
   name: keyVaultName
@@ -56,6 +68,8 @@ resource existingWebApp 'Microsoft.Web/sites@2023-12-01' existing = {
   name: webAppName
 }
 
+
+
 resource kvRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(roleIdMapping['Key Vault Secrets User'], existingWebApp.name, keyVault.name)
   scope: keyVault
@@ -66,11 +80,33 @@ resource kvRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
 }
 
+resource existingFuncApp 'Microsoft.Web/sites@2022-03-01' existing = {
+  name: fnAppName
+}
+
+resource kvRoleAssignmentFnApp 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(roleIdMapping['Key Vault Secrets User'], existingFuncApp.name, keyVault.name)
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIdMapping['Key Vault Secrets User'])
+    principalId: existingFuncApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource secret 'Microsoft.KeyVault/vaults/secrets@2024-04-01-preview' = {
   parent: keyVault
   name: keyVaultSecretName
   properties: {
     value: keyVaultSecretValue
+  }
+}
+
+resource ghostAPISecret 'Microsoft.KeyVault/vaults/secrets@2024-04-01-preview' = {
+  parent: keyVault
+  name: ghostApiSecretName
+  properties: {
+    value: ghostApiKey
   }
 }
 
@@ -179,3 +215,4 @@ resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
 // End of configuring private endpoint
 
 output secretUri string = secret.properties.secretUri
+output ghostAPISecretUri string = ghostAPISecret.properties.secretUri

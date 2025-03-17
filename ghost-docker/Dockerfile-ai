@@ -1,4 +1,4 @@
-FROM ghost:latest AS build
+FROM --platform=linux/amd64 ghost:5-alpine AS build
 
 RUN apt-get update && apt-get install -y \
     python3 \

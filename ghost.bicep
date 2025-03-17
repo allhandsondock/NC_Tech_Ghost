@@ -4,7 +4,7 @@ targetScope = 'resourceGroup'
 param applicationNamePrefix string = 'ghost'
 
 @description('App Service Plan pricing tier')
-param appServicePlanSku string = 'B1'
+param appServicePlanSku string = 'B2'
 
 @description('Log Analytics workspace pricing tier')
 param logAnalyticsWorkspaceSku string = 'PerGB2018'
@@ -23,7 +23,7 @@ param mySQLServerSku string = 'Standard_B1ms'
 param databasePassword string
 
 @description('Ghost container full image name and tag')
-param ghostContainerName string = 'ghost:latest'
+param ghostContainerName string = 'allhandsondock/ghost-route:v8'
 
 @description('Container registry where the image is hosted')
 param containerRegistryUrl string = 'https://index.docker.io/v1'
@@ -51,13 +51,14 @@ var logAnalyticsWorkspaceName = '${applicationNamePrefix}-la-${uniqueString(reso
 var applicationInsightsName = '${applicationNamePrefix}-ai-${uniqueString(resourceGroup().id)}'
 var keyVaultName = '${applicationNamePrefix}-kv-${uniqueString(resourceGroup().id)}'
 var storageAccountName = '${applicationNamePrefix}stor${uniqueString(resourceGroup().id)}'
+var functionAppName = '${applicationNamePrefix}-func-${uniqueString(resourceGroup().id)}'
 
 var mySQLServerName = '${applicationNamePrefix}-mysql-${uniqueString(resourceGroup().id)}'
 var databaseLogin = 'ghost'
 var databaseName = 'ghost'
 
 var ghostContentFileShareName = 'contentfiles'
-var ghostContentFilesMountPath = '/var/lib/ghost/content_files'
+var ghostContentFilesMountPath = '/var/lib/ghost/content'
 var siteUrl = (deploymentConfiguration == 'afd')
   ? 'https://${frontDoor.outputs.frontDoorEndpointHostName}'
   : 'https://${webApp.outputs.hostName}'
@@ -110,14 +111,18 @@ module keyVault './modules/keyVault.bicep' = {
     keyVaultName: keyVaultName
     keyVaultSecretName: 'databasePassword'
     keyVaultSecretValue: databasePassword
+    ghostApiKey: '' // Create an API key after ghost blog is provisioned and store in Keyvault. This is to create a placeholder in keyvault under secret name 'ghostAPIKey'
+    ghostApiSecretName: 'ghostAPIKey'
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
     location: location
     vNetName: vNetName
     privateEndpointsSubnetName: privateEndpointsSubnetName
     webAppName: webAppName
+    fnAppName: functionAppName
   }
   dependsOn: [
     webApp
+    functionApp
     vNet
     logAnalyticsWorkspace
   ]
@@ -134,7 +139,7 @@ module webApp './modules/webApp.bicep' = {
     webAppIntegrationSubnetName: webAppIntegrationSubnetName
   }
   dependsOn: [
-    appServicePlan
+   appServicePlan
     vNet
     logAnalyticsWorkspace
   ]
@@ -157,8 +162,6 @@ module webAppSettings 'modules/webAppSettings.bicep' = {
     storageAccountName: storageAccountName
   }
   dependsOn: [
-    webApp
-    frontDoor
     mySQLServer
   ]
 }
@@ -219,6 +222,37 @@ module frontDoor 'modules/frontDoor.bicep' = if (deploymentConfiguration == 'afd
   dependsOn: [
     webApp
     logAnalyticsWorkspace
+  ]
+}
+
+module functionApp 'modules/functionApps.bicep' = {
+  name: 'functionAppDeploy'
+  params: {
+    funcAppName: functionAppName
+    location: location
+    azFuncAsp: webApp.outputs.serverFarmId
+    isPrimary: true
+    storageAccName: storageAccountName
+    
+  }
+  dependsOn: [
+    appServicePlan
+    logAnalyticsWorkspace
+  ]
+}
+
+module azFuncAppSetting 'modules/functionAppSettings.bicep' =  {
+  name: 'fnAppSetting'
+  params:{
+    fnAppName: functionAppName
+    aiKey: applicationInsights.outputs.instKey
+    storageAccountName: storageAccountName
+    ghostUrl: 'https://${webApp.outputs.hostName}'
+    isPrimary: true
+    ghostAPISecretUri: keyVault.outputs.ghostAPISecretUri
+  }
+  dependsOn:[
+    functionApp
   ]
 }
 

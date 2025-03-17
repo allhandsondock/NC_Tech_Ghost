@@ -1,0 +1,12 @@
+{
+    "name": "ghost backend",
+    "version": "1.0.0",
+  
+    "scripts": {
+      "start": "func start"
+    },
+    "dependencies": {
+      "@tryghost/admin-api": "1.13.2"
+    }
+   
+  }

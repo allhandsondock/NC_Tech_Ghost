@@ -94,3 +94,5 @@ resource applicationInsightsDiagnostics 'Microsoft.Insights/diagnosticSettings@2
     ]
   }
 }
+
+output instKey string = applicationInsights.properties.InstrumentationKey

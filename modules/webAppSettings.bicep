@@ -73,14 +73,7 @@ resource siteConfig 'Microsoft.Web/sites/config@2023-12-01' = {
         mountPath: containerMountPath
         accessKey: existingStorageAccount.listKeys().keys[0].value
       }
-      ContentFilesVolume2: {
-        type: 'AzureFiles'
-        accountName: existingStorageAccount.name
-        shareName: fileShareName
-        mountPath: '/var/lib/ghost/content_files/settings/routes.yaml'
-        accessKey: existingStorageAccount.listKeys().keys[0].value
-      }
-      
+     
     }
   }
 }
