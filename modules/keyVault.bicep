@@ -35,7 +35,9 @@ param webAppName string
 @description('Function App name to provide access to Key Vault')
 param fnAppName string
 
-resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
+
+
+resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' =  {
   name: keyVaultName
   location: location
   properties: {
@@ -214,5 +216,10 @@ resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
 }
 // End of configuring private endpoint
 
-output secretUri string = secret.properties.secretUri
+// Onl single resource group deployment
+//output secretUri string = secret.properties.secretUri
+//output ghostAPISecretUri string = ghostAPISecret.properties.secretUri
+
+
+output secretUri string =  secret.properties.secretUri
 output ghostAPISecretUri string = ghostAPISecret.properties.secretUri

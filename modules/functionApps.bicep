@@ -2,17 +2,15 @@
 param azFuncAsp string
 param funcAppName string
 param location string
-param isPrimary bool
 param storageAccName string
 
-resource ghostbackend 'Microsoft.Web/sites@2022-03-01' = if(isPrimary) {
+resource ghostbackend 'Microsoft.Web/sites@2022-03-01' =  {
   name: funcAppName
   kind: 'functionapp'
   location: location
   properties: {
     enabled: true
-   
-   
+    publicNetworkAccess: 'Disabled'
     serverFarmId: azFuncAsp
     siteConfig: {
       numberOfWorkers: 1
@@ -48,6 +46,30 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1') // Storage Blob Data Contributor Role
     principalId: ghostbackend.identity.principalId
   }
+}
+
+// Configuring virtual network integration
+@description('Virtual network for a private endpoint')
+param vNetName string
+@description('Target subnet to integrate web app')
+param webAppIntegrationSubnetName string
+
+resource existingvNet 'Microsoft.Network/virtualNetworks@2024-01-01' existing = {
+  name: vNetName
+}
+
+resource existingSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
+  name: webAppIntegrationSubnetName
+  parent: existingvNet
+}
+
+resource webApp_vNetIntegration 'Microsoft.Web/sites/networkConfig@2023-12-01' = {
+  parent: ghostbackend
+  name: 'virtualNetwork'
+  properties: {
+    subnetResourceId: existingSubnet.id
+  }
+  
 }
 
 output azFuncMI string = ghostbackend.identity.principalId

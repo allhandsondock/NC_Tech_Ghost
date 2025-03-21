@@ -1,85 +1,15 @@
 targetScope = 'resourceGroup'
 
-@minLength(3)
-@maxLength(63)
-param mySQLServerName string
-
-@allowed([
-  'Standard_B1ms'
-  'Standard_B2ms'
-  'Standard_D2ads_v5'
-])
-param mySQLServerSku string
-
-@description('Database administrator login name')
-@minLength(1)
-param administratorLogin string
-
-@description('Database administrator password')
-@secure()
-param administratorPassword string
-
-@description('Location to deploy the resources')
+param mysqlServerId string
 param location string = resourceGroup().location
 
-
-
-@description('Log Analytics workspace to use for diagnostics settings')
-param logAnalyticsWorkspaceName string
-
-resource mySQLServer 'Microsoft.DBforMySQL/flexibleServers@2023-12-30' = {
-  name: mySQLServerName
-  location: location
-  sku: {
-    name: mySQLServerSku
-    tier: 'GeneralPurpose'
-  }
-  properties: {
-    createMode: 'Default'
-    version: '8.0.21'
-    administratorLogin: administratorLogin
-    administratorLoginPassword: administratorPassword
-    network: {
-      publicNetworkAccess: 'Disabled'
-    }
-  }
-}
-
-resource existingWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-  name: logAnalyticsWorkspaceName
-}
-
-resource mySQLServerDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  scope: mySQLServer
-  name: 'MySQLServerDiagnostics'
-  properties: {
-    workspaceId: existingWorkspace.id
-    metrics: [
-      {
-        category: 'AllMetrics'
-        enabled: true
-      }
-    ]
-    logs: [
-      {
-        category: 'MySqlSlowLogs'
-        enabled: true
-      }
-      {
-        category: 'MySqlAuditLogs'
-        enabled: true
-      }
-    ]
-  }
-}
 
 // Configuring private endpoint
 @description('Virtual network for a private endpoint')
 param vNetName string
 @description('Target subnet to create a private endpoint')
 param privateEndpointsSubnetName string
-
-var privateEndpointName = 'ghost-pl-mysql-${uniqueString(resourceGroup().id)}'
+var privateEndpointName = 'ghost-pl-mysql-sec-${uniqueString(resourceGroup().id)}'
 var privateDnsZoneName = 'privatelink.mysql.database.azure.com'
 var pvtEndpointDnsGroupName = '${privateEndpointName}/mysql'
 
@@ -87,15 +17,14 @@ resource existingVNet 'Microsoft.Network/virtualNetworks@2024-01-01' existing = 
   name: vNetName
 }
 
-
 resource existingSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
+  
   name: privateEndpointsSubnetName
   parent: existingVNet
 }
 
-
-
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+  
   name: privateEndpointName
   location: location
   properties: {
@@ -106,7 +35,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
       {
         name: privateEndpointName
         properties: {
-          privateLinkServiceId: mySQLServer.id
+          privateLinkServiceId: mysqlServerId
           groupIds: [
             'mysqlServer'
           ]
@@ -116,9 +45,8 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
   }
 }
 
-
-
 resource privateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  
   name: privateDnsZoneName
   location: 'global'
   properties: {}
@@ -152,6 +80,4 @@ resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
     privateEndpoint
   ]
 }
-// End of configuring private endpoint
-output mysqlurl string = mySQLServer.properties.fullyQualifiedDomainName
-output mysqlId string = mySQLServer.id
+

@@ -20,7 +20,7 @@ param appServicePlanName string
 param appServicePlanSku string
 
 @description('Location to deploy the resources')
-param location string = resourceGroup().location
+param location string 
 
 @description('Log Analytics workspace to use for diagnostics settings')
 param logAnalyticsWorkspaceName string

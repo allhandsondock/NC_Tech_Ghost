@@ -13,6 +13,7 @@ param logAnalyticsWorkspaceName string
 @description('Web app to confire Front Door for')
 param webAppName string
 
+
 var frontDoorEndpointName = applicationName
 var frontDoorOriginGroupName = '${applicationName}-OriginGroup'
 var frontDoorOriginName = '${applicationName}-Origin'

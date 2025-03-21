@@ -1,11 +1,10 @@
 param fnAppName string
 param aiKey string
 param storageAccountName string
-param isPrimary bool
 param ghostUrl string
 param ghostAPISecretUri string
 
-resource fnappSetting 'Microsoft.Web/sites/config@2021-01-15' = if(isPrimary) {
+resource fnappSetting 'Microsoft.Web/sites/config@2021-01-15' =  {
   name: '${fnAppName}/appsettings'
   properties: {
     APPINSIGHTS_INSTRUMENTATIONKEY: aiKey
