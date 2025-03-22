@@ -7,7 +7,7 @@ targetScope = 'resourceGroup'
 param applicationNamePrefix string = 'ghost'
 
 @description('App Service Plan pricing tier')
-param appServicePlanSku array = [ 'B1', 'B2']
+param appServicePlanSku array = [ 'S1', 'S2']
 
 @description('Log Analytics workspace pricing tier')
 param logAnalyticsWorkspaceSku string = 'PerGB2018'
@@ -23,8 +23,8 @@ param regions array = [
 
 @description('Array of resource group names corresponding to each region')
 param resourceGroups array = [
-  'pp3'
-  'ss3'
+  'pp9'
+  'ss9'
 ]
 
 
@@ -43,7 +43,6 @@ param containerRegistryUrl string = 'https://index.docker.io/v1'
 
 @allowed([
   'Web app only'
-  'Web app with Azure Front Door'
   'afd'
 ])
 param deploymentConfiguration string = 'afd'
@@ -88,14 +87,16 @@ var functionAppNames = [for i in range(0, length(regions)): '${applicationNamePr
 
 // Front Door is deployed only in the primary region (index 0)
 var frontDoorName = '${applicationNamePrefix}-fd-${uniqueString(resourceGroups[0])}'
-var siteUrl = (deploymentConfiguration == 'Web app only')
+var siteUrl = (deploymentConfiguration == 'afd')
   ? 'https://${frontDoor.outputs.frontDoorEndpointHostName}'
   : 'https://${webApp[0].outputs.hostName}'
+
+
 //
 // MODULE DEPLOYMENTS (loop over each region)
 //
 
-// 1. Virtual Network
+//  Virtual Network
 module vNet 'modules/virtualNetwork.bicep' = [for i in range(0, length(regions)): {
   name: 'vNetDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -110,7 +111,7 @@ module vNet 'modules/virtualNetwork.bicep' = [for i in range(0, length(regions))
   }
 }]
 
-// 2. Log Analytics Workspace
+// Log Analytics Workspace
 module logAnalyticsWorkspace './modules/logAnalyticsWorkspace.bicep' = [for i in range(0, length(regions)): {
   name: 'logAnalyticsWorkspaceDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -121,7 +122,7 @@ module logAnalyticsWorkspace './modules/logAnalyticsWorkspace.bicep' = [for i in
   }
 }]
 
-// 3. Storage Account (with file share)
+//  Storage Account (with file share)
 module storageAccount 'modules/storageAccount.bicep' = [for i in range(0, length(regions)): {
   name: 'storageAccountDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -140,7 +141,7 @@ module storageAccount 'modules/storageAccount.bicep' = [for i in range(0, length
   ]
 }]
 
-// 4. App Service Plan
+// App Service Plan
 module appServicePlan './modules/appServicePlan.bicep' = [for i in range(0, length(regions)): {
   name: 'appServicePlanDeploy${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -155,36 +156,8 @@ module appServicePlan './modules/appServicePlan.bicep' = [for i in range(0, leng
   ]
 }]
 
-// module appServicePlan './modules/appServicePlan.bicep' = {
-//   name: 'appServicePlanDeploy11'
-//   scope: resourceGroup(resourceGroups[0])
-//   params: {
-//     appServicePlanName: appServicePlanNames[0]
-//     appServicePlanSku: appServicePlanSku[0]
-//     location: regions[0]
-//     logAnalyticsWorkspaceName: logAnalyticsWorkspaceNames[0]
-//   }
-//   dependsOn: [
-//     logAnalyticsWorkspace[0]
-//   ]
-// }
 
-// module appServicePlan2 './modules/appServicePlan.bicep' = {
-//   name: 'appServicePlanDeploy22'
-//   scope: resourceGroup(resourceGroups[1])
-//   params: {
-//     appServicePlanName: appServicePlanNames[1]
-//     appServicePlanSku: appServicePlanSku[1]
-//     location: regions[1]
-//     logAnalyticsWorkspaceName: logAnalyticsWorkspaceNames[1]
-//   }
-//   dependsOn: [
-//     appServicePlan
-//     logAnalyticsWorkspace[1]
-//   ]
-// }
-
-// 5. Web App
+//  Web App in both regions
 module webApp './modules/webApp.bicep' = [for i in range(0, length(regions)): {
   name: 'webAppDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -203,7 +176,7 @@ module webApp './modules/webApp.bicep' = [for i in range(0, length(regions)): {
   ]
 }]
 
-// 6. Application Insights
+//  Application Insights
 module applicationInsights './modules/applicationInsights.bicep' = [for i in range(0, length(regions)): {
   name: 'applicationInsightsDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -219,7 +192,7 @@ module applicationInsights './modules/applicationInsights.bicep' = [for i in ran
   ]
 }]
 
-// 7. MySQL Server
+//  MySQL Server - Primary
 module mySQLServer 'modules/mySQLServer.bicep' = {
   name: 'mySQLServerDeploy'
   scope: resourceGroup(resourceGroups[0])
@@ -239,6 +212,7 @@ module mySQLServer 'modules/mySQLServer.bicep' = {
   ]
 }
 
+// A mySQL server replica in the secondary region
 module mySQLServerReplica 'modules/mySQLServer-replica.bicep' = {
   name: 'mySQLServerDeploy-replica'
   scope: resourceGroup(resourceGroups[0])
@@ -250,6 +224,8 @@ module mySQLServerReplica 'modules/mySQLServer-replica.bicep' = {
     mySQLServerName: mySQLServerNames[1]
     sourceServerId: mySQLServer.outputs.mysqlId
     mySQLServerSku: mySQLServerSku
+    // vNetName: vNetNames[0]
+    // privateEndpointsSubnetName: privateEndpointsSubnetName
   }
   dependsOn: [
     vNet[0]
@@ -258,14 +234,31 @@ module mySQLServerReplica 'modules/mySQLServer-replica.bicep' = {
   ]
 }
 
-// configure network for the replica
-module mySQLServerReplicaNetwork 'modules/mySQLServer-replica-network.bicep' = {
+// configure pep for the replica in secondary vnet
+module mySQLServerReplicaNetworkSecondary 'modules/mySQLServer-replica-network.bicep' = {
   name: 'mySQLServerDeploy-replica-network'
   scope: resourceGroup(resourceGroups[1])
   params: {
     location: regions[1]
     mysqlServerId: mySQLServerReplica.outputs.mysqlId
     vNetName: vNetNames[1]
+    privateEndpointsSubnetName: privateEndpointsSubnetName
+  }
+  dependsOn: [
+    vNet[0]
+    vNet[1]
+    logAnalyticsWorkspace[0]
+  ]
+}
+
+// configure pep for the replica in primary vnet
+module mySQLServerReplicaNetworkPrimary 'modules/mySQLServer-replica-network.bicep' = {
+  name: 'mySQLServerDeploy-replica-network'
+  scope: resourceGroup(resourceGroups[0])
+  params: {
+    location: regions[0]
+    mysqlServerId: mySQLServerReplica.outputs.mysqlId
+    vNetName: vNetNames[0]
     privateEndpointsSubnetName: privateEndpointsSubnetName
   }
   dependsOn: [
@@ -291,8 +284,7 @@ module mySQLServerNetwork 'modules/mySQLServer-network.bicep' = {
   ]
 }
 
-
-// 8. Function App
+// funcation apps in both regions
 module functionApp 'modules/functionApps.bicep' = [for i in range(0, length(regions)): {
   name: 'functionAppDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -311,7 +303,7 @@ module functionApp 'modules/functionApps.bicep' = [for i in range(0, length(regi
   ]
 }]
 
-// 9. Function App Settings
+// Function app settings
 module azFuncAppSetting 'modules/functionAppSettings.bicep' = [for i in range(0, length(regions)): {
   name: 'fnAppSetting-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -319,7 +311,7 @@ module azFuncAppSetting 'modules/functionAppSettings.bicep' = [for i in range(0,
     fnAppName: functionAppNames[i]
     aiKey: applicationInsights[i].outputs.instKey
     storageAccountName: storageAccountNames[i]
-    ghostUrl: 'https://${webApp[i].outputs.hostName}'
+    ghostUrl: siteUrl
     ghostAPISecretUri: keyVault[i].outputs.ghostAPISecretUri
   }
   dependsOn:[
@@ -329,7 +321,7 @@ module azFuncAppSetting 'modules/functionAppSettings.bicep' = [for i in range(0,
   ]
 }]
 
-// 10. Key Vault
+// Key Vault
 module keyVault './modules/keyVault.bicep' = [for i in range(0, length(regions)): {
   name: 'keyVaultDeploy-${i}'
   scope: resourceGroup(resourceGroups[i])
@@ -372,9 +364,9 @@ module webAppSettings 'modules/webAppSettings.bicep' = [for i in range(0, length
     fileShareName: storageAccount[i].outputs.fileShareFullName
     storageAccountName: storageAccountNames[i]
     resourceGroupName: resourceGroups[0]
+    frontDoorId: frontDoor.outputs.id
   }
   dependsOn: [
-    frontDoor
     mySQLServer
     webApp[i]
     keyVault[i]
@@ -390,18 +382,12 @@ module frontDoor 'modules/frontDoor.bicep' = if (deploymentConfiguration == 'afd
     applicationName: applicationNamePrefix
     webAppName: '${applicationNamePrefix}-web-0-${uniqueString(resourceGroups[0])}'
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceNames[0]
+    secondaryWebAppHostname: webApp[1].outputs.hostName
   }
   dependsOn: [
     webApp[0]
+    webApp[1]
     logAnalyticsWorkspace[0]
   ]
 }
 
-// //
-// // OUTPUTS
-// //
-// // output webAppHostNames array = [for w in webApp: w.outputs.hostName]
-// // output endpointHostName string = deploymentConfiguration == 'afd'
-// //   ? 'https://${frontDoor.outputs.frontDoorEndpointHostName}'
-// //   : webApp.outputs[0].hostName
-// // output mysqlNames array = [for m in mySQLServer: m.outputs.mysqlurl]

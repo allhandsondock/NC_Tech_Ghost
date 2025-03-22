@@ -38,6 +38,8 @@ param containerMountPath string
 
 param resourceGroupName string
 
+param frontDoorId string
+
 var containerImageReference = 'DOCKER|${ghostContainerImage}'
 
 resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -78,6 +80,21 @@ resource siteConfig 'Microsoft.Web/sites/config@2023-12-01' = {
       }
      
     }
+    ipSecurityRestrictions: [
+      {
+        ipAddress: 'AzureFrontDoor.Backend'
+        action: 'Allow'
+        tag: 'ServiceTag'
+        priority: 100
+        name: 'Allow traffic from Front Door'
+        headers: {
+          'x-azure-fdid': [
+            frontDoorId //Scoping access to a unique Front Door instance
+          ]
+        }
+      }
+    ]
+    
   }
 }
 
@@ -127,3 +144,4 @@ CAUw7C29C79Fv1C5qfPrmAESrciIxpg0X40KPMbp1ZWVbd4=
 -----END CERTIFICATE-----'''
   }
 }
+

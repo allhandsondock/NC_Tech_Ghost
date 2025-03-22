@@ -40,10 +40,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing 
 
 // Assign Storage Blob Data Contributor Role to Function App Identity
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(ghostbackend.name, 'StorageBlobDataContributor')
+  name: guid(ghostbackend.name, 'StorageBlobDataOwner')
   scope: storageAccount
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1') // Storage Blob Data Contributor Role
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b') // Storage Blob Data Owner Role
     principalId: ghostbackend.identity.principalId
   }
 }

@@ -54,6 +54,7 @@ resource existingWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01'
   name: logAnalyticsWorkspaceName
 }
 
+
 resource mySQLServerDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   scope: mySQLServer
   name: 'MySQLServerDiagnostics'
@@ -75,7 +76,9 @@ resource mySQLServerDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-0
         enabled: true
       }
     ]
+    
   }
+ 
 }
 
 output mysqlId string = mySQLServer.id

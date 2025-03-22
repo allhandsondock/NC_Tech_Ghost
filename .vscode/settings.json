@@ -1,0 +1,10 @@
+{
+    "azureFunctions.deploySubpath": "AzFunc",
+    "azureFunctions.postDeployTask": "npm install (functions)",
+    "azureFunctions.projectLanguage": "JavaScript",
+    "azureFunctions.projectRuntime": "~4",
+    "debug.internalConsoleOptions": "neverOpen",
+    "azureFunctions.projectSubpath": "src/GhostAdmin",
+    "azureFunctions.preDeployTask": "npm prune (functions)",
+    "azureFunctions.projectLanguageModel": 4
+}

@@ -13,6 +13,9 @@ param logAnalyticsWorkspaceName string
 @description('Web app to confire Front Door for')
 param webAppName string
 
+@secure()
+param secondaryWebAppHostname string
+
 
 var frontDoorEndpointName = applicationName
 var frontDoorOriginGroupName = '${applicationName}-OriginGroup'
@@ -57,6 +60,8 @@ resource existingWebApp 'Microsoft.Web/sites@2023-12-01' existing = {
   name: webAppName
 }
 
+
+
 resource frontDoorOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
   name: frontDoorOriginName
   parent: frontDoorOriginGroup
@@ -70,11 +75,26 @@ resource frontDoorOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01
   }
 }
 
+resource frontDoorOriginSecondary 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = {
+  name: '${frontDoorOriginName}-sec'
+  parent: frontDoorOriginGroup
+  properties: {
+    hostName: secondaryWebAppHostname
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: secondaryWebAppHostname
+    priority: 5
+    weight: 1
+    enabledState: 'Disabled'
+  }
+}
+
 resource frontDoorRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = {
   name: frontDoorRouteName
   parent: frontDoorEndpoint
   dependsOn: [
     frontDoorOrigin
+    frontDoorOriginSecondary
   ]
   properties: {
     originGroup: {
@@ -180,26 +200,8 @@ resource frontDoorDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-
   }
 }
 
-resource siteConfig 'Microsoft.Web/sites/config@2023-12-01' = {
-  parent: existingWebApp
-  name: 'web'
-  properties: {
-    ipSecurityRestrictions: [
-      {
-        ipAddress: 'AzureFrontDoor.Backend'
-        action: 'Allow'
-        tag: 'ServiceTag'
-        priority: 100
-        name: 'Allow traffic from Front Door'
-        headers: {
-          'x-azure-fdid': [
-            frontDoorProfile.properties.frontDoorId //Scoping access to a unique Front Door instance
-          ]
-        }
-      }
-    ]
-  }
-}
+
+
 
 resource ruleSets 'Microsoft.Cdn/profiles/ruleSets@2024-02-01' = {
   parent: frontDoorProfile
@@ -249,6 +251,7 @@ name: 'cachePosts'
   }
   dependsOn: [
     frontDoorOrigin
+    frontDoorOriginSecondary
   ]
 }
 
@@ -295,3 +298,4 @@ name: 'excludeCache'
 
 
 output frontDoorEndpointHostName string = frontDoorEndpoint.properties.hostName
+output id string = frontDoorProfile.properties.frontDoorId
