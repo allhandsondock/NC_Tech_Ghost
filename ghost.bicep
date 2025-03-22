@@ -16,17 +16,12 @@ param logAnalyticsWorkspaceSku string = 'PerGB2018'
 param storageAccountSku string = 'Standard_LRS'
 
 @description('Array of regions to deploy the resources')
-param regions array = [
-  'northeurope' 
-  'westeurope'
-]
+@maxLength(2)
+param regions array 
 
 @description('Array of resource group names corresponding to each region')
-param resourceGroups array = [
-  'pp9'
-  'ss9'
-]
-
+@maxLength(2)
+param resourceGroups array 
 
 @description('MySQL server SKU')
 param mySQLServerSku string = 'Standard_D2ads_v5'
@@ -390,4 +385,3 @@ module frontDoor 'modules/frontDoor.bicep' = if (deploymentConfiguration == 'afd
     logAnalyticsWorkspace[0]
   ]
 }
-
