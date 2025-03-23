@@ -10,11 +10,12 @@ const api = new GhostAdminAPI({
 
 app.http('deletePosts', {
     methods: ['GET', 'POST'],
-    authLevel: 'anonymous',
+    authLevel: 'admin',
     handler: async (request, context) => {
         context.log(`Http function processed request for url "${request.url}"`);
+        
         try {
-            // Fetch all posts
+            //Fetch all posts
             const posts = await api.posts.browse({ limit: "all" });
             context.log(`posts"${posts.length}"`);
             if (posts.length === 0) {

@@ -1,0 +1,72 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- none
+
+pool:
+  default
+
+parameters:
+- name: PriApp
+  displayName: Primary Az Func Name
+  default: ghost-pri-func-app
+
+- name: SecApp
+  displayName: Secondary Az Func Name
+  default: ghost-sec-func-app
+  
+
+stages:
+- stage: DEV
+  displayName: 'Deploy DEV'
+  jobs:
+  - job: Deploy
+    steps:
+
+    - checkout: self  
+
+    - bash: |
+        if [ -f extensions.csproj ]
+        then
+            dotnet build extensions.csproj --output ./bin
+        fi
+        npm install 
+        npm run build --if-present
+        npm prune --production
+    - task: ArchiveFiles@2
+      displayName: "Archive files"
+      inputs:
+        rootFolderOrFile: "$(System.DefaultWorkingDirectory)/AzFunc"
+        includeRootFolder: false
+        archiveFile: "$(System.DefaultWorkingDirectory)/build$(Build.BuildId).zip"
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(System.DefaultWorkingDirectory)/build$(Build.BuildId).zip'
+        artifactName: 'drop'
+    
+    - task: DownloadBuildArtifacts@1
+      inputs:
+        artifactName: 'drop'
+        
+        downloadPath: '$(Build.ArtifactStagingDirectory)'
+    - task: AzureFunctionApp@2
+      inputs:
+        connectedServiceNameARM: 'ado-spn'
+        appType: 'functionAppLinux'
+        appName: ${{ parameters.PriApp }}
+        package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
+        runtimeStack: 'NODE|20'
+        deploymentMethod: 'zipDeploy'
+
+    - task: AzureFunctionApp@2
+      inputs:
+        connectedServiceNameARM: 'ado-spn'
+        appType: 'functionAppLinux'
+        appName: ${{ parameters.SecApp }}
+        package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
+        runtimeStack: 'NODE|20'
+        deploymentMethod: 'zipDeploy'
+        

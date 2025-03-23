@@ -374,7 +374,7 @@ module frontDoor 'modules/frontDoor.bicep' = if (deploymentConfiguration == 'afd
   scope: resourceGroup(resourceGroups[0]) 
   params: {
     frontDoorProfileName: frontDoorName
-    applicationName: applicationNamePrefix
+    applicationName: '${applicationNamePrefix}-ep-${uniqueString(resourceGroups[0])}'
     webAppName: '${applicationNamePrefix}-web-0-${uniqueString(resourceGroups[0])}'
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceNames[0]
     secondaryWebAppHostname: webApp[1].outputs.hostName

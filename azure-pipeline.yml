@@ -1,0 +1,74 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  - none
+  
+pool:
+    default
+  
+  
+stages:
+  - stage: DEV
+    displayName: 'Deploy DEV'
+    variables:
+    - group: dev-var-lib
+    jobs:
+    - job: Deploy
+      steps:
+  
+      - checkout: self  
+  
+      - task: AzurePowerShell@5
+        displayName: 'Deploy Bicep Template'
+        inputs:
+          azureSubscription: 'ado-spn'  # Replace with your Azure DevOps Service Connection
+          ScriptType: 'InlineScript'
+          Inline: |
+  
+            
+            $password = ConvertTo-SecureString $(dbPassword) -AsPlainText -Force
+            
+            $out = New-AzDeployment -Location westus `
+              -TemplateFile './ghost.bicep' `
+              -TemplateParameterFile './ghost.parameters.dev.json' `
+              -databasePassword $password `
+              -DeploymentDebugLogLevel "All"
+              
+  
+            Write-Host "Deployment Output: $out"
+          azurePowerShellVersion: 'LatestVersion'
+  
+  - stage: TEST
+    displayName: 'Deploy TEST'
+    variables:
+    - group: test-var-lib
+    jobs:
+    - job: Deploy
+      steps:
+  
+      - checkout: self  
+  
+      - task: AzurePowerShell@5
+        displayName: 'Deploy Bicep Template'
+        inputs:
+          azureSubscription: 'ado-spn'  # Replace with your Azure DevOps Service Connection
+          ScriptType: 'InlineScript'
+          Inline: |
+  
+            
+            $password = ConvertTo-SecureString $(dbPassword) -AsPlainText -Force
+            
+            $out = New-AzDeployment -Location westus `
+              -TemplateFile './ghost.bicep' `
+              -TemplateParameterFile './ghost.parameters.test.json' `
+              -databasePassword $password `
+              -DeploymentDebugLogLevel "All"
+              
+  
+            Write-Host "Deployment Output: $out"
+          azurePowerShellVersion: 'LatestVersion'
+  
+   

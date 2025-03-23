@@ -34,7 +34,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   properties: {
     supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'disabled'
   }
 }
 
@@ -170,117 +170,67 @@ resource pvtEndpointDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
 }
 // End of configuring private endpoint
 
-// resource uploadScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
-//   name: 'uploadFileScript'
-//   location: location
-//   kind: 'AzurePowerShell'
-//   identity: {
-//     type: 'UserAssigned'
-//     userAssignedIdentities: {
-//       '${scriptIdentity.id}': {}
-//     }
-//   }
-//   properties: {
-//     azPowerShellVersion: '7.2'
-//     arguments: '-resourceGroupName ${resourceGroup().name} -storageAccountName ${storageAccountName} -fileShareFolderName ${fileShareFolderName}'
-//     scriptContent: '''
-//     param(
-//         [string]$resourceGroupName,
-//         [string]$storageAccountName,
-//         [string]$fileShareFolderName
-//       )
-
-//       $ghoststorageAccount = Get-AzStorageAccount -ResourceGroupName $resourceGroupName -Name $storageAccountName
-//       $context = $ghoststorageAccount.Context
-//       New-AzStorageDirectory -ShareName $fileShareFolderName -Path 'settings' -Context $context -ErrorAction SilentlyContinue
-//       Set-AzStorageFileContent -ShareName $fileShareFolderName -Source './routes.yaml' -Path 'settings/routes.yaml' -Context $context
-//     '''
-//      retentionInterval: 'PT1H'
-//     cleanupPreference: 'OnSuccess'
-//   }
-//   dependsOn: [
-//     fileShare
-//     dataReaderRoleAssignment
-//   ]
-// }
-
-// resource uploadScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
-//   name: 'uploadFileScript'
-//   location: location
-//   kind: 'AzureCLI'
-//   properties: {
-//     azCliVersion: '2.40.0'
-//     timeout: 'PT5M'
-//     retentionInterval: 'PT1H'
-//     environmentVariables: [
-//       {
-//         name: 'AZURE_STORAGE_ACCOUNT'
-//         value: storageAccount.name
-//       }
-//       {
-//         name: 'AZURE_STORAGE_KEY'
-//         secureValue: storageAccount.listKeys().keys[0].value
-//       }
-//       {
-//         name: 'CONTENT'
-//         value: loadTextContent('./routes.yaml')
-//       }
-//     ]
-//     scriptContent: '''
-    
-//     az storage directory create --name settings -s ${fileShareFolderName}
-//     echo "$CONTENT" > ${filename} && az storage file upload --source ${filename} -s ${fileShareFolderName} -p ${destPath}
-
-//     '''
-//   }
-//   dependsOn: [
-//     fileShare
-//     dataReaderRoleAssignment
-//   ]
-// }
+var privateEndpointBlobName = 'ghost-pl-blob-${uniqueString(resourceGroup().id)}'
+var privateDnsZoneBlobName = 'privatelink.blob.${environment().suffixes.storage}'
+var pvtEndpointDnsGroupBlobName = '${privateEndpointBlobName}/blob'
 
 
-// @description('The Storage Reader Role definition from [Built In Roles](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles).')
-// resource storageBlobDataReaderRoleDef 'Microsoft.Authorization/roleDefinitions@2022-05-01-preview' existing = {
-//   scope: subscription()
-//   name: 'c12c1c16-33a1-487b-954d-41c89c60f349'
-// }
-
-// @description('The Storage Blob Data Reader Role definition from [Built In Roles](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles).')
-// resource storageFileDataContributorRoleDef 'Microsoft.Authorization/roleDefinitions@2022-05-01-preview' existing = {
-//   scope: subscription()
-//   name: '69566ab7-960f-475b-8e7c-b3118f30c6bd'
-// }
-
-// resource scriptIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-07-31-preview' = {
-//   name: 'script-identity'
-//   location: location
-// }
-
-// @description('Assign permission for the deployment scripts user identity access to the read blobs from the storage account.')
-// resource dataReaderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-//   scope: storageAccount
-//   name: guid(storageBlobDataReaderRoleDef.id, scriptIdentity.id, storageAccount.id)
-//   properties: {
-//     principalType: 'ServicePrincipal'
-//     principalId: scriptIdentity.properties.principalId
-//     roleDefinitionId: storageBlobDataReaderRoleDef.id
-//   }
- 
-// }
+resource privateDnsZoneBlob 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: privateDnsZoneBlobName
+  location: 'global'
+  properties: {}
+}
 
 
-// @description('Assign permission for the deployment scripts user identity access to the write files from the storage account.')
-// resource dataContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-//   scope: storageAccount
-//   name: guid(storageFileDataContributorRoleDef.id, scriptIdentity.id, storageAccount.id)
-//   properties: {
-//     principalType: 'ServicePrincipal'
-//     principalId: scriptIdentity.properties.principalId
-//     roleDefinitionId: storageFileDataContributorRoleDef.id
-//   }
-  
-// }
+resource privateDnsZoneNameBlob_privateDnsZoneName_link 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: privateDnsZoneBlob
+  name: '${existingVNet.name}-link-blob'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: existingVNet.id
+    }
+  }
+}
+
+resource privateEndpointBlob 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+  name: privateEndpointBlobName
+  location: location
+  properties: {
+    subnet: {
+      id: existingSubnet.id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointBlobName
+        properties: {
+          privateLinkServiceId: storageAccount.id
+          groupIds: [
+            'blob'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource pvtEndpointDnsGroupBlob 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+  name: pvtEndpointDnsGroupBlobName
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'config2'
+        properties: {
+          privateDnsZoneId: privateDnsZoneBlob.id
+        }
+      }
+    ]
+  }
+  dependsOn: [
+    privateEndpointBlob
+  ]
+}
 
 output fileShareFullName string = fileShare.name
 output strgAccId string = storageAccount.id

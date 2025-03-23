@@ -12,14 +12,16 @@ resource ghostbackend 'Microsoft.Web/sites@2022-03-01' =  {
     enabled: true
     publicNetworkAccess: 'Disabled'
     serverFarmId: azFuncAsp
+    
     siteConfig: {
       numberOfWorkers: 1
-      linuxFxVersion: ''
+      linuxFxVersion: 'NODE|20'
       acrUseManagedIdentityCreds: false
-      alwaysOn: false
+      alwaysOn: true
       http20Enabled: false
       functionAppScaleLimit: 200
       minimumElasticInstanceCount: 0
+      
     }
    
 
